@@ -9,20 +9,15 @@
  * @format
  * @flow strict-local
  */
-
 'use strict';
-
 import type DraftEditor from 'DraftEditor.react';
-
 const DraftModifier = require('DraftModifier');
 const EditorState = require('EditorState');
 const Keys = require('Keys');
-
 const getEntityKeyForSelection = require('getEntityKeyForSelection');
 const gkx = require('gkx');
 const isEventHandled = require('isEventHandled');
 const isSelectionAtLeafStart = require('isSelectionAtLeafStart');
-
 /**
  * Millisecond delay to allow `compositionstart` to fire again upon
  * `compositionend`.
@@ -34,7 +29,6 @@ const isSelectionAtLeafStart = require('isSelectionAtLeafStart');
  * sooner than we want.
  */
 const RESOLVE_DELAY = 20;
-
 /**
  * A handful of variables used to track the current composition and its
  * resolution status. These exist at the module level because it is not
@@ -44,12 +38,11 @@ const RESOLVE_DELAY = 20;
 let resolved = false;
 let stillComposing = false;
 let textInputData = '';
-
+let compositionInputData = '';
 const DraftEditorCompositionHandler = {
   onBeforeInput: function(editor: DraftEditor, e: SyntheticInputEvent<>): void {
     textInputData = (textInputData || '') + e.data;
   },
-
   /**
    * A `compositionstart` event has fired while we're still in composition
    * mode. Continue the current composition session to prevent a re-render.
@@ -57,7 +50,6 @@ const DraftEditorCompositionHandler = {
   onCompositionStart: function(editor: DraftEditor): void {
     stillComposing = true;
   },
-
   /**
    * Attempt to end the current composition session.
    *
@@ -75,13 +67,13 @@ const DraftEditorCompositionHandler = {
   onCompositionEnd: function(editor: DraftEditor, e: SyntheticEvent<>): void {
     resolved = false;
     stillComposing = false;
+    compositionInputData = e.data;
     setTimeout(() => {
       if (!resolved) {
         DraftEditorCompositionHandler.resolveComposition(editor, e);
       }
     }, RESOLVE_DELAY);
   },
-
   /**
    * In Safari, keydown events may fire when committing compositions. If
    * the arrow keys are used to commit, prevent default so that the cursor
@@ -101,7 +93,6 @@ const DraftEditorCompositionHandler = {
       e.preventDefault();
     }
   },
-
   /**
    * Keypress events may fire when committing compositions. In Firefox,
    * pressing RETURN commits the composition and inserts extra newline
@@ -113,7 +104,6 @@ const DraftEditorCompositionHandler = {
       e.preventDefault();
     }
   },
-
   /**
    * Attempt to insert composed characters into the document.
    *
@@ -136,33 +126,27 @@ const DraftEditorCompositionHandler = {
     if (stillComposing) {
       return;
     }
-
     resolved = true;
-    const composedChars = textInputData;
+    const composedChars = textInputData || compositionInputData;
     textInputData = '';
-
+    compositionInputData = '';
     const editorState = EditorState.set(editor._latestEditorState, {
       inCompositionMode: false,
     });
-
     const currentStyle = editorState.getCurrentInlineStyle();
     const entityKey = getEntityKeyForSelection(
       editorState.getCurrentContent(),
       editorState.getSelection(),
     );
-
     const mustReset =
       !composedChars ||
       isSelectionAtLeafStart(editorState) ||
       currentStyle.size > 0 ||
       entityKey !== null;
-
     if (mustReset) {
       editor.restoreEditorDOM();
     }
-
     editor.exitCurrentMode();
-
     if (composedChars) {
       if (
         gkx('draft_handlebeforeinput_composed_text') &&
@@ -191,7 +175,6 @@ const DraftEditorCompositionHandler = {
       );
       return;
     }
-
     if (mustReset) {
       editor.update(
         EditorState.set(editorState, {
@@ -202,5 +185,4 @@ const DraftEditorCompositionHandler = {
     }
   },
 };
-
 module.exports = DraftEditorCompositionHandler;
